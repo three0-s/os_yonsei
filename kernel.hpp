@@ -22,8 +22,9 @@ namespace os{
         public:
             Kernel(std::string _cwd);
             void updateStatus(std::string command, os::Process* process);
-            void modeChange(os::Mode dstMode);
+            void newProcess(std::string pNmame, int ppid);
             void runProgram(std::string fname, int ppid);
+
     };
 
 }

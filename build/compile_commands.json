@@ -1,0 +1,14 @@
+[
+{
+  "directory": "/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/build",
+  "command": "/usr/local/bin/g++-12   -g -std=gnu++17 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.3.sdk -o CMakeFiles/project2.dir/core.cpp.o -c \"/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/core.cpp\"",
+  "file": "/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/core.cpp",
+  "output": "CMakeFiles/project2.dir/core.cpp.o"
+},
+{
+  "directory": "/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/build",
+  "command": "/usr/local/bin/g++-12   -g -std=gnu++17 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.3.sdk -o CMakeFiles/project2.dir/main.cpp.o -c \"/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/main.cpp\"",
+  "file": "/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/main.cpp",
+  "output": "CMakeFiles/project2.dir/main.cpp.o"
+}
+]

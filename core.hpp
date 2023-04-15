@@ -9,11 +9,12 @@ namespace os{
     class Process {
         public:
             std::string name; // process name
+            int cur;
             int pid; // PID
             int ppid; // PPID
             char waiting_type; // S or W when paused
-            Process(std::string _name, int _pid, int _ppid, char _waiting_type):
-                name(_name), pid(_pid), ppid(_ppid), waiting_type(_waiting_type){}
+            Process(std::string _name, int _cur, int _pid, int _ppid, char _waiting_type):
+                name(_name),cur(_cur),pid(_pid), ppid(_ppid), waiting_type(_waiting_type){}
     };
 
     class Status {

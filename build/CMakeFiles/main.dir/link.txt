@@ -1,1 +1,0 @@
-/usr/local/bin/g++-12 -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.3.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/main.dir/core.cpp.o CMakeFiles/main.dir/main.cpp.o -o "/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/main" 

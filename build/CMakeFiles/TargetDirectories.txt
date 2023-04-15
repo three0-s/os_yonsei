@@ -1,5 +1,0 @@
-/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/build/CMakeFiles/project2.dir
-/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/build/CMakeFiles/package.dir
-/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/build/CMakeFiles/package_source.dir
-/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/build/CMakeFiles/edit_cache.dir
-/Users/yewon/Library/CloudStorage/OneDrive-연세대학교(YonseiUniversity)/예원/YONSEI/23-1/운영체제/hw2/src/build/CMakeFiles/rebuild_cache.dir

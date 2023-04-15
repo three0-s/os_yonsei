@@ -8,13 +8,12 @@
 */
 #include "common.hpp"
 #include "core.hpp"
-
-
-using namespace std;
-using namespace os;
+#include "kernel.hpp"
 
 int main(int argc, char** argv) {
-    string dir = argv[1];
-    
+    std::string dir = argv[1];
+    os::Kernel simulator;
+    os::Kernel::cwd = dir;
+    simulator.runProgram("init", 0);
     return 0;
 }

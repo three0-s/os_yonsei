@@ -12,7 +12,6 @@ namespace os{
     class Kernel{
         private:
             static uint64_t cycle;
-            static std::string cwd;
             static const std::vector<std::string> syscalls;
             static const std::vector<std::string> commands;
             static std::queue<os::Process*> ready_que;
@@ -20,7 +19,7 @@ namespace os{
             static os::Status kernel_status;
 
         public:
-            Kernel(std::string _cwd);
+            static std::string cwd;
             void updateStatus(std::string command, os::Process* process);
             void newProcess(std::string pNmame, int ppid);
             void runProgram(std::string fname, int ppid);

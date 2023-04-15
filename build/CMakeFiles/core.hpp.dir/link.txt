@@ -1,1 +1,0 @@
-/usr/local/bin/g++-12 -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX13.3.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/core.hpp.dir/core.cpp.o CMakeFiles/core.hpp.dir/main.cpp.o -o core.hpp 

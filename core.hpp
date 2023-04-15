@@ -6,16 +6,19 @@
 
 namespace os{
 
-    struct Process {
-        std::string name; // process name
-        int pid; // PID
-        int ppid; // PPID
-        char waiting_type; // S or W when paused
+    class Process {
+        public:
+            std::string name; // process name
+            int pid; // PID
+            int ppid; // PPID
+            char waiting_type; // S or W when paused
+            Process(std::string _name, int _pid, int _ppid, char _waiting_type):
+                name(_name), pid(_pid), ppid(_ppid), waiting_type(_waiting_type){}
     };
 
     class Status {
         public:
-            uint64_t cycle;
+            uint64_t& cycle;
             std::string mode;
             std::string command;
             Process* process_running;

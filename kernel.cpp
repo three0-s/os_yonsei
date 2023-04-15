@@ -78,10 +78,12 @@ void os::Kernel::updateStatus(std::string command, os::Process* process){
         this->kernel_status.command="schedule";
         while(SLEEP_CNT--){
             if (SLEEP_CNT==0){
-                os::Process* restored = this->waiting_que.front();
-                restored->waiting_type = '0';
-                this->waiting_que.pop();
-                this->ready_que.push(restored);
+                if (!this->waiting_que.empty()){
+                    os::Process* restored = this->waiting_que.front();
+                    restored->waiting_type = '0';
+                    this->waiting_que.pop();
+                    this->ready_que.push(restored);
+                }
                 this->kernel_status.process_running = this->ready_que.front();
                 this->ready_que.pop();
             }

@@ -22,13 +22,13 @@ namespace os{
             std::string mode;
             std::string command;
             Process* process_running;
-            std::queue<os::Process*> process_ready;
-            std::queue<os::Process*> process_waiting;
+            std::queue<os::Process*>& process_ready;
+            std::queue<os::Process*>& process_waiting;
             os::Process* process_new;
             os::Process* process_terminated;
 
         public:
-            void printStatus();
+            void printStatus(std::string fname);
             Status(uint64_t& _cycle, 
                    std::string _mode, 
                    std::string _command, 

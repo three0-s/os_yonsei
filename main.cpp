@@ -12,8 +12,8 @@
 
 int main(int argc, char** argv) {
     std::string dir = argv[1];
-    os::Kernel simulator;
     os::Kernel::cwd = dir;
+    os::Kernel simulator;
     simulator.runProgram("init", 0);
     return 0;
 }

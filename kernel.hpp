@@ -23,6 +23,8 @@ namespace os{
             void updateStatus(std::string command, os::Process* process);
             void newProcess(std::string pNmame, int ppid);
             void runProgram(std::string fname, int ppid);
+            void printKernelStatus();
+            Kernel();
 
     };
 

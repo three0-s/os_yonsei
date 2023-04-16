@@ -10,11 +10,13 @@ namespace os{
         public:
             std::string name; // process name
             int cur;
+            int sleep_cycle;
+            int n_run;
             int pid; // PID
             int ppid; // PPID
             char waiting_type; // S or W when paused
-            Process(std::string _name, int _cur, int _pid, int _ppid, char _waiting_type):
-                name(_name),cur(_cur),pid(_pid), ppid(_ppid), waiting_type(_waiting_type){}
+            Process(std::string _name, int _cur, int _sleep_cycle, int _n_run, int _pid, int _ppid, char _waiting_type):
+                name(_name),cur(_cur), sleep_cycle(_sleep_cycle), n_run(_n_run), pid(_pid), ppid(_ppid), waiting_type(_waiting_type){}
     };
 
     class Status {

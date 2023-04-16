@@ -18,6 +18,8 @@ namespace os{
             void newProcess(std::string pNmame, int ppid);
             void printKernelStatus();
             void run();
+            void run_();
+            std::string commandSchedule();
             Kernel();
     };
 

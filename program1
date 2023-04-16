@@ -1,3 +1,4 @@
-sleep 2
-run 3
+wait
+run 5
+fork_and_exec program2
 exit

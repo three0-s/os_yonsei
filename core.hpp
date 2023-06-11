@@ -49,6 +49,17 @@ namespace os{
                process_new(new_ps),
                process_terminated(term_ps){}
     };
+
+    class Memory{
+        public:
+
+    };
+    class VirtualMemory: Memory{
+
+    };
+    class PhysicalMemory: Memory{
+
+    };
 }
 
 

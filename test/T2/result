@@ -1,0 +1,63 @@
+[cycle #0]
+1. mode: kernel
+2. command: boot
+3. running: none
+4. ready: none
+5. waiting: none
+6. new: 1(init, 0)
+7. terminated: none
+
+[cycle #1]
+1. mode: kernel
+2. command: schedule
+3. running: 1(init, 0)
+4. ready: none
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #2]
+1. mode: user
+2. command: sleep 2
+3. running: 1(init, 0)
+4. ready: none
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #3]
+1. mode: kernel
+2. command: system call
+3. running: none
+4. ready: none
+5. waiting: 1(S)
+6. new: none
+7. terminated: none
+
+[cycle #4]
+1. mode: kernel
+2. command: schedule
+3. running: 1(init, 0)
+4. ready: none
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #5]
+1. mode: user
+2. command: exit
+3. running: 1(init, 0)
+4. ready: none
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #6]
+1. mode: kernel
+2. command: system call
+3. running: none
+4. ready: none
+5. waiting: none
+6. new: none
+7. terminated: 1(init, 0)
+

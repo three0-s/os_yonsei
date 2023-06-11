@@ -1,6 +1,0 @@
-sleep 3
-fork_and_exec program1
-run 5
-fork_and_exec program2
-wait
-exit

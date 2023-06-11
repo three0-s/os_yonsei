@@ -7,7 +7,7 @@ namespace os{
     class Kernel{
         private:
             static uint64_t cycle;
-            static const std::vector<std::string> commands;
+            // static const std::vector<std::string> commands;
             static std::queue<os::Process*> ready_que;
             static std::queue<os::Process*> waiting_que;
             static os::Status kernel_status;
@@ -18,7 +18,6 @@ namespace os{
             void newProcess(std::string pNmame, int ppid);
             void printKernelStatus();
             void run();
-            void run_();
             std::string commandSchedule();
             Kernel();
     };

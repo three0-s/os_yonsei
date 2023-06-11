@@ -1,0 +1,216 @@
+[cycle #0]
+1. mode: kernel
+2. command: boot
+3. running: none
+4. ready: none
+5. waiting: none
+6. new: 1(init, 0)
+7. terminated: none
+
+[cycle #1]
+1. mode: kernel
+2. command: schedule
+3. running: 1(init, 0)
+4. ready: none
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #2]
+1. mode: user
+2. command: fork_and_exec p1
+3. running: 1(init, 0)
+4. ready: none
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #3]
+1. mode: kernel
+2. command: system call
+3. running: none
+4. ready: 1
+5. waiting: none
+6. new: 2(p1, 1)
+7. terminated: none
+
+[cycle #4]
+1. mode: kernel
+2. command: schedule
+3. running: 1(init, 0)
+4. ready: 2
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #5]
+1. mode: user
+2. command: fork_and_exec p2
+3. running: 1(init, 0)
+4. ready: 2
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #6]
+1. mode: kernel
+2. command: system call
+3. running: none
+4. ready: 2 1
+5. waiting: none
+6. new: 3(p2, 1)
+7. terminated: none
+
+[cycle #7]
+1. mode: kernel
+2. command: schedule
+3. running: 2(p1, 1)
+4. ready: 1 3
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #8]
+1. mode: user
+2. command: sleep 7
+3. running: 2(p1, 1)
+4. ready: 1 3
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #9]
+1. mode: kernel
+2. command: system call
+3. running: none
+4. ready: 1 3
+5. waiting: 2(S)
+6. new: none
+7. terminated: none
+
+[cycle #10]
+1. mode: kernel
+2. command: schedule
+3. running: 1(init, 0)
+4. ready: 3
+5. waiting: 2(S)
+6. new: none
+7. terminated: none
+
+[cycle #11]
+1. mode: user
+2. command: wait
+3. running: 1(init, 0)
+4. ready: 3
+5. waiting: 2(S)
+6. new: none
+7. terminated: none
+
+[cycle #12]
+1. mode: kernel
+2. command: system call
+3. running: none
+4. ready: 3
+5. waiting: 2(S) 1(W)
+6. new: none
+7. terminated: none
+
+[cycle #13]
+1. mode: kernel
+2. command: schedule
+3. running: 3(p2, 1)
+4. ready: none
+5. waiting: 2(S) 1(W)
+6. new: none
+7. terminated: none
+
+[cycle #14]
+1. mode: user
+2. command: exit
+3. running: 3(p2, 1)
+4. ready: none
+5. waiting: 2(S) 1(W)
+6. new: none
+7. terminated: none
+
+[cycle #15]
+1. mode: kernel
+2. command: system call
+3. running: none
+4. ready: 2 1
+5. waiting: none
+6. new: none
+7. terminated: 3(p2, 1)
+
+[cycle #16]
+1. mode: kernel
+2. command: schedule
+3. running: 2(p1, 1)
+4. ready: 1
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #17]
+1. mode: user
+2. command: run 1
+3. running: 2(p1, 1)
+4. ready: 1
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #18]
+1. mode: user
+2. command: exit
+3. running: 2(p1, 1)
+4. ready: 1
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #19]
+1. mode: kernel
+2. command: system call
+3. running: none
+4. ready: 1
+5. waiting: none
+6. new: none
+7. terminated: 2(p1, 1)
+
+[cycle #20]
+1. mode: kernel
+2. command: schedule
+3. running: 1(init, 0)
+4. ready: none
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #21]
+1. mode: user
+2. command: run 1
+3. running: 1(init, 0)
+4. ready: none
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #22]
+1. mode: user
+2. command: exit
+3. running: 1(init, 0)
+4. ready: none
+5. waiting: none
+6. new: none
+7. terminated: none
+
+[cycle #23]
+1. mode: kernel
+2. command: system call
+3. running: none
+4. ready: none
+5. waiting: none
+6. new: none
+7. terminated: 1(init, 0)
+

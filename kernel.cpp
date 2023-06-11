@@ -13,12 +13,10 @@ os::Status os::Kernel::kernel_status= {os::Kernel::cycle, "kernel", "NONE",
                                        os::Kernel::waiting_que, 
                                        NULL, NULL};
 
-// Allowed Commands
-const std::vector<std::string> os::Kernel::commands = {"sleep", "fork_and_exec", "wait", "exit", "run"};
 // =============================================================================
 
 os::Kernel::Kernel(){
-    std::ofstream resultFile(this->cwd+"/result", std::ios_base::trunc);
+    std::ofstream resultFile("result", std::ios_base::trunc);
     if (resultFile.is_open()){
         resultFile << "";
     }
@@ -26,7 +24,7 @@ os::Kernel::Kernel(){
 }
 
 void os::Kernel::printKernelStatus(){
-    this->kernel_status.printStatus(this->cwd+"/result");
+    this->kernel_status.printStatus("result");
 }
 
 std::string os::Kernel::commandSchedule(){
@@ -62,7 +60,7 @@ void os::Kernel::run(){
     os::Process* program = new Process("init", 0, 0, 0, pid++, ppid, '0');
     std::queue<Process*> activated;
     std::string userOperation="", cmd;
-
+   
     while(true){
         // terminate the simulator
         if (this->cycle>0 && this->ready_que.empty() && this->waiting_que.empty() && this->kernel_status.process_running==NULL
@@ -70,25 +68,31 @@ void os::Kernel::run(){
             break;
 
         int queSize =  this->waiting_que.size();
-        // sleep cycle check
-        for (int i=0; i < queSize; i++){
-            if (this->waiting_que.front()->waiting_type=='S')
-                this->waiting_que.front()->sleep_cycle--;
-            // pop process of which sleep cycle ends
-            if (this->waiting_que.front()->sleep_cycle==0 && this->waiting_que.front()->waiting_type=='S'){
-                this->waiting_que.front()->waiting_type='0';
-                activated.push(this->waiting_que.front());
-                this->waiting_que.pop();
-                continue;
+        // // // sleep cycle update
+        // // for (int i=0; i < queSize; i++){
+        // //     if (this->waiting_que.front()->waiting_type=='S')
+        // //         this->waiting_que.front()->sleep_cycle--;
+        // //     this->waiting_que.push(this->waiting_que.front());
+        // //     this->waiting_que.pop();
+        // // }
+        if (userOperation!="exit"){
+            // for (int i=0; i < queSize; i++){
+            //     // pop process of which sleep cycle ends
+            //     if (this->waiting_que.front()->sleep_cycle==0 && this->waiting_que.front()->waiting_type=='S'){
+            //         this->waiting_que.front()->waiting_type='0';
+            //         activated.push(this->waiting_que.front());
+            //         this->waiting_que.pop();
+            //         continue;
+            //     }
+            //     this->waiting_que.push(this->waiting_que.front());
+            //     this->waiting_que.pop();
+            // }
+            while(!activated.empty()){
+                this->ready_que.push(activated.front());
+                activated.pop();
             }
-            this->waiting_que.push(this->waiting_que.front());
-            this->waiting_que.pop();
+
         }
-        while(!activated.empty()){
-            this->ready_que.push(activated.front());
-            activated.pop();
-        }
-        
         // command
         cmd = this->commandSchedule();
         if (cmd == "prev")  cmd = userOperation;
@@ -115,17 +119,16 @@ void os::Kernel::run(){
             if (userOperation.find("sleep") != std::string::npos){
                 int SLEEP_CNT = std::stoi(userOperation.substr(6));
                 Process* currentProcess = this->kernel_status.process_running;
-                currentProcess->waiting_type='S';
-                currentProcess->sleep_cycle=SLEEP_CNT;
-                this->waiting_que.push(currentProcess);
-                this->kernel_status.process_running = NULL;
-            
-                if (--currentProcess->sleep_cycle==0){
-                    os::Process* restored = this->waiting_que.front();
-                    restored->waiting_type = '0';
-                    this->waiting_que.pop();
-                    this->ready_que.push(restored);
+                this->kernel_status.process_running=NULL;
+                if (--SLEEP_CNT!=0){
+                    currentProcess->waiting_type='S';
+                    currentProcess->sleep_cycle=SLEEP_CNT;
+                    this->waiting_que.push(currentProcess);
                 }
+                else{
+                    this->ready_que.push(currentProcess);
+                }
+                
                 this->printKernelStatus();
             }
             // wait
@@ -161,15 +164,27 @@ void os::Kernel::run(){
             else if(userOperation == "exit"){
                 this->kernel_status.process_terminated = this->kernel_status.process_running;
                 this->kernel_status.process_running=NULL;
-                
-                // check if the parent process is waiting
-                if (!this->waiting_que.empty()){
-                    if (this->waiting_que.front()->pid == this->kernel_status.process_terminated->ppid){
-                        os::Process* parent = this->waiting_que.front();
-                        parent-> waiting_type='0';
-                        this->ready_que.push(parent);
+                queSize =  this->waiting_que.size();
+                // pop process of which sleep cycle ends
+                for (int i=0; i < queSize; i++){
+                    if (this->waiting_que.front()->sleep_cycle==0 && this->waiting_que.front()->waiting_type=='S'){
+                        this->waiting_que.front()->waiting_type='0';
+                        activated.push(this->waiting_que.front());
                         this->waiting_que.pop();
+                        continue;
                     }
+                    if (this->waiting_que.front()->pid == this->kernel_status.process_terminated->ppid && this->waiting_que.front()->waiting_type=='W'){
+                        this->waiting_que.front()->waiting_type='0';
+                        activated.push(this->waiting_que.front());
+                        this->waiting_que.pop();
+                        continue;
+                    }
+                    this->waiting_que.push(this->waiting_que.front());
+                    this->waiting_que.pop();
+                }
+                while(!activated.empty()){
+                    this->ready_que.push(activated.front());
+                    activated.pop();
                 }
         
                 this->printKernelStatus();
@@ -187,19 +202,35 @@ void os::Kernel::run(){
                 }
                 this->printKernelStatus();
             }
+            // memory_allocate
+            else if(userOperation.find("memory_allocate") != std::string::npos){
+                
+            }
+            // memory_release
+            else if(userOperation.find("memory_release") != std::string::npos){
+                
+            }
+
+            // memory_read fault
+            else if(userOperation.find("memory_read") != std::string::npos){
+                
+            }
+
+            // memory_write fault
+            else if(userOperation.find("memory_write") != std::string::npos){
+                
+            }
+            
         }
         // user mode
         else{
-            // "run"
-            // user mode operation
-            if (cmd.find("run") != std::string::npos){
-                int RCYCLE = std::stoi(cmd.substr(4));
-                // init RCYCLE of the process
-                if (this->kernel_status.process_running->n_run == 0 && userOperation!=cmd)
-                    this->kernel_status.process_running->n_run=RCYCLE;
-                
-                this->kernel_status.process_running->n_run--;
-                this->printKernelStatus();
+            // memory read
+            if(cmd.find("memory_read") != std::string::npos){
+                // MEM READ
+            }
+            // memory write
+            else if(cmd.find("memory_write") != std::string::npos){
+                // MEM WRITE
             }
             // mode switch
             // "sleep", "fork_and_exec", "wait", "exit"
@@ -210,6 +241,7 @@ void os::Kernel::run(){
             }
             userOperation=cmd;
         }
+
         this->cycle++;
     }
 }

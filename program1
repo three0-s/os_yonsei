@@ -1,4 +1,0 @@
-wait
-run 5
-fork_and_exec program2
-exit

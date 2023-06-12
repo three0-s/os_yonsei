@@ -1,5 +1,7 @@
 #include "core.hpp"
 
+
+
 void os::Status::printStatus(std::string fname){
     std::ofstream resultFile(fname, std::ios_base::app);
     if (resultFile.is_open()){
@@ -58,4 +60,134 @@ void os::Status::printStatus(std::string fname){
         resultFile << "\n";
     }
     resultFile.close();
+}
+
+
+uint8_t os::PhysicalMemory::frameAlloc(uint64_t tick, std::string method){
+    // out of memory
+    if (base == os::PSIZE){
+        // out of memory
+        uint8_t victim;
+
+        if (method=="lru"){
+            victim = 0;
+            for (int i=1; i < this->order.size(); i++){
+                if (order[i] < order[victim]) victim=i;
+            }
+        }
+        else if (method=="fifo"){
+            victim = this->fifo.front();
+            this->fifo.pop();
+        }
+        else if (method=="lfu"){
+            victim = 0;
+            for (int i=1; i < frequency.size(); i++){
+                if (frequency[i] < frequency[victim]) victim=i;
+            }
+        }
+        else if (method=="mfu"){
+            victim = 0;
+            for (int i=1; i < frequency.size(); i++){
+                if (frequency[i] > frequency[victim]) victim=i;
+            }
+        } 
+        return victim;
+
+    }else{
+        uint8_t ret = base;
+        // lru
+        this->order[this->base]=tick;
+        // lfu, mfu
+        this->frequency[this->base]++;
+        // fifo
+        this->fifo.push(this->base);
+
+
+        // update the base and limit register
+        if (limit-1 > 0){
+            this->base++;
+            this->limit--;
+        }
+        else this->updateMemReg();
+        return ret;
+    }
+}
+
+
+void os::Process::malloc(uint8_t n_alloc, os::PhysicalMemory* pMem, uint64_t cycle, std::string method){
+    for (uint8_t i=0; i < n_alloc; i++){
+        uint8_t idx = virtual_memory.pageID + i;
+        page_table[idx].first = idx;
+        page_table[idx].second = pMem->frameAlloc(cycle, method);
+        virtual_memory.allocationIDs[idx] = virtual_memory.allocID;
+    }
+
+    virtual_memory.pageID+= n_alloc;
+    virtual_memory.allocID++;
+}
+
+
+
+void os::PhysicalMemory::updateMemReg(){
+    bool hasHole=false;
+    for (int i=0; i < os::PSIZE; i++){
+        if (hasHole){
+            if (this->occupied[i]) break;
+            this->limit++;
+        }
+        if (!this->occupied[i] && !hasHole){
+            hasHole=true;
+            this->base = i;
+            this->limit = 1;
+        }
+    }
+    if (!hasHole){
+        this->base=os::PSIZE;
+        this->limit=0;
+    }
+}
+
+
+os::VirtualMemory::VirtualMemory(const os::VirtualMemory& vm): Memory(vm.m_size), 
+                    allocationIDs(vm.allocationIDs.size()),
+                    permissions(vm.permissions.size()){
+    pageID = vm.pageID;
+    allocID = vm.allocID;
+    for (int i=0; i < vm.m_size; i++){
+        allocationIDs[i]=vm.allocationIDs[i];
+        permissions[i]=vm.permissions[i];
+    }
+}
+
+
+void os::Process::frameRelease(uint8_t allocID, os::PhysicalMemory* pMem){
+    for (int i=0; i < os::VSIZE; i++){
+        // release
+        if (virtual_memory.allocationIDs[i]==allocID){
+            if (virtual_memory.permissions[i]=='R'){
+                // DO SOMETHING
+                // Read only permission
+            } else{
+                page_table[i].second=-1;
+                pMem->occupied[i]=false;
+                virtual_memory.allocationIDs[i]=-1;
+                pMem->updateMemReg();
+            }
+        }
+    }
+}
+
+void os::Process::releaseAll(os::PhysicalMemory* pMem){
+    for (int i=0; i < os::VSIZE; i++){
+        // release
+        if (virtual_memory.permissions[i]=='R'){
+            // DO SOMETHING
+            // Read only permission
+        } else{
+            page_table[i].second=-1;
+            pMem->occupied[i]=false;
+            virtual_memory.allocationIDs[i]=-1;
+            pMem->updateMemReg();
+        }
+    }
 }

@@ -12,7 +12,9 @@
 
 int main(int argc, char** argv) {
     std::string dir = argv[1];
+    std::string pChange = argv[2];
     os::Kernel::cwd = dir;
+    os::Kernel::method = pChange;
     os::Kernel simulator;
     simulator.run();
     return 0;

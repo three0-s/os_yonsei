@@ -12,10 +12,9 @@ os::Status os::Kernel::kernel_status= {os::Kernel::cycle, "kernel", "NONE",
                                        os::Kernel::ready_que, 
                                        os::Kernel::waiting_que, 
                                        NULL, NULL};
-
 // =============================================================================
 
-os::Kernel::Kernel(){
+os::Kernel::Kernel(): physical_memory(os::PSIZE), fault(false){
     std::ofstream resultFile("result", std::ios_base::trunc);
     if (resultFile.is_open()){
         resultFile << "";
@@ -32,7 +31,12 @@ std::string os::Kernel::commandSchedule(){
         // boot
         if (this->cycle==0) return "boot";
         // system call
-        if (this->kernel_status.process_running!=NULL) return "system call";
+        if (this->kernel_status.process_running!=NULL){
+            // memory fault
+            if(this->fault) return "fault";
+            return "system call";
+        }
+            
         // schedule
         if (!this->ready_que.empty() || this->kernel_status.process_new!=NULL) return "schedule";
         else    return "idle";
@@ -57,7 +61,7 @@ std::string os::Kernel::commandSchedule(){
 
 void os::Kernel::run(){
     int pid=1, ppid=0;
-    os::Process* program = new Process("init", 0, 0, 0, pid++, ppid, '0');
+    os::Process* program = new Process("init", 0, 0, 0, pid++, ppid, '0', os::VSIZE, os::PSIZE);
     std::queue<Process*> activated;
     std::string userOperation="", cmd;
    
@@ -163,6 +167,7 @@ void os::Kernel::run(){
             // exit
             else if(userOperation == "exit"){
                 this->kernel_status.process_terminated = this->kernel_status.process_running;
+                this->kernel_status.process_terminated->releaseAll(&(this->physical_memory));
                 this->kernel_status.process_running=NULL;
                 queSize =  this->waiting_que.size();
                 // pop process of which sleep cycle ends
@@ -194,46 +199,111 @@ void os::Kernel::run(){
             // fork_and_exec
             else if(userOperation.find("fork_and_exec") != std::string::npos){
                 std::string pName = userOperation.substr(14);
-                program = new Process(pName, 0, 0, 0, pid++, ppid, '0');
-                this->kernel_status.process_new = program;
-                if (this->kernel_status.process_running != NULL){
-                    this->ready_que.push(this->kernel_status.process_running);
-                    this->kernel_status.process_running = NULL;
+                program = new Process(pName, 0, 0, 0, pid++, ppid, '0', os::VSIZE, os::PSIZE);
+
+                // copy parents' virtual memory and page table
+                program->virtual_memory = this->kernel_status.process_running->virtual_memory;
+                program->page_table = this->kernel_status.process_running->page_table;
+
+                // change permission 
+                for (int i=0; i < os::VSIZE; i++){
+                    program->virtual_memory.permissions[i]='R';
+                    this->kernel_status.process_running->virtual_memory.permissions[i]='R';
                 }
+
+                this->kernel_status.process_new = program;
+                
+                this->ready_que.push(this->kernel_status.process_running);
+                this->kernel_status.process_running = NULL;
+                
                 this->printKernelStatus();
             }
+
             // memory_allocate
             else if(userOperation.find("memory_allocate") != std::string::npos){
+                uint8_t n_alloc = (uint8_t)std::stoi(userOperation.substr(strlen("memory_allocate")+1));
                 
+                for (uint8_t i=0; i < n_alloc; i++){
+                    uint8_t idx = this->kernel_status.process_running->virtual_memory.pageID + i;
+                    this->kernel_status.process_running->page_table[idx].first = idx;
+                    this->kernel_status.process_running->page_table[idx].second = this->physical_memory.frameAlloc(this->cycle, os::Kernel::method);
+                    this->kernel_status.process_running->virtual_memory.allocationIDs[idx] = this->kernel_status.process_running->virtual_memory.allocID;
+                }
+
+                this->kernel_status.process_running->virtual_memory.pageID+= n_alloc;
+                this->kernel_status.process_running->virtual_memory.allocID++;
+
+                this->kernel_status.process_ready.push(this->kernel_status.process_running);
+                this->kernel_status.process_running = NULL;
+
+                this->printKernelStatus();
+
             }
             // memory_release
             else if(userOperation.find("memory_release") != std::string::npos){
-                
-            }
+                uint8_t allocID = (uint8_t)std::stoi(userOperation.substr(strlen("memory_release")+1));
+                this->kernel_status.process_running->frameRelease(allocID, &(this->physical_memory));
+                this->kernel_status.process_ready.push(this->kernel_status.process_running);
+                this->kernel_status.process_running = NULL;
 
-            // memory_read fault
-            else if(userOperation.find("memory_read") != std::string::npos){
-                
-            }
-
-            // memory_write fault
-            else if(userOperation.find("memory_write") != std::string::npos){
-                
+                this->printKernelStatus();
             }
             
+        }
+        else if (cmd == "fault"){
+            // memory_read page fault
+            if(userOperation.find("memory_read") != std::string::npos){
+                
+                
+                this->ready_que.push(this->kernel_status.process_running);
+                this->kernel_status.process_running = NULL;
+                this->printKernelStatus();
+            }
+
+            // memory_write fault ( protection || page )
+            else if(userOperation.find("memory_write") != std::string::npos){
+                // Parent process should have ppid of 0
+                if (this->kernel_status.process_running->ppid==0){
+                    
+                // Child process
+                } else{
+
+                }
+                this->ready_que.push(this->kernel_status.process_running);
+                this->kernel_status.process_running = NULL;
+                
+                this->printKernelStatus();
+            }
         }
         // user mode
         else{
             // memory read
             if(cmd.find("memory_read") != std::string::npos){
-                // MEM READ
+                uint8_t pageID = (uint8_t)std::stoi(cmd.substr(strlen("memory_read")+1));
+                this->printKernelStatus(); 
+                if (this->kernel_status.process_running->page_table[pageID].second == -1){
+                    this->kernel_status.mode="kernel";
+                    this->fault=true;
+                }
             }
             // memory write
             else if(cmd.find("memory_write") != std::string::npos){
-                // MEM WRITE
+                uint8_t pageID = (uint8_t)std::stoi(cmd.substr(strlen("memory_write")+1));
+                this->printKernelStatus(); 
+                // 'W' permission -  page fault
+                if (this->kernel_status.process_running->virtual_memory.permissions[pageID]=='W'){
+                    if (this->kernel_status.process_running->page_table[pageID].second == -1){
+                        this->kernel_status.mode="kernel";
+                        this->fault=true;
+                    }
+                // 'R' permission -  protection fault
+                } else{
+                    this->kernel_status.mode="kernel";
+                    this->fault=true;
+                }
             }
             // mode switch
-            // "sleep", "fork_and_exec", "wait", "exit"
+            // "sleep", "fork_and_exec", "wait", "exit", "memory allocate", "memory release"
             else{
                 this->printKernelStatus(); 
                 this->kernel_status.mode="kernel";

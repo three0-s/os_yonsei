@@ -1,4 +1,0 @@
-fork_and_exec program1
-sleep 4
-wait
-exit

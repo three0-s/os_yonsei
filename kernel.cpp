@@ -6,6 +6,7 @@
 std::queue<os::Process*> os::Kernel::ready_que;
 std::queue<os::Process*> os::Kernel::waiting_que;
 std::string os::Kernel::cwd = "";
+std::string os::Kernel::method = "fifo";
 uint64_t os::Kernel::cycle = 0;
 os::Status os::Kernel::kernel_status= {os::Kernel::cycle, "kernel", "NONE", 
                                        NULL,
@@ -23,7 +24,7 @@ os::Kernel::Kernel(): physical_memory(os::PSIZE), fault(false){
 }
 
 void os::Kernel::printKernelStatus(){
-    this->kernel_status.printStatus("result");
+    this->kernel_status.printStatus("result", &physical_memory);
 }
 
 std::string os::Kernel::commandSchedule(){
@@ -61,7 +62,7 @@ std::string os::Kernel::commandSchedule(){
 
 void os::Kernel::run(){
     int pid=1, ppid=0;
-    os::Process* program = new Process("init", 0, 0, 0, pid++, ppid, '0', os::VSIZE, os::PSIZE);
+    os::Process* program = new Process("init", 0, 0, 0, pid++, ppid, '0', os::VSIZE, new VirtualMemory(os::VSIZE), os::PSIZE);
     std::queue<Process*> activated;
     std::string userOperation="", cmd;
    
@@ -72,25 +73,8 @@ void os::Kernel::run(){
             break;
 
         int queSize =  this->waiting_que.size();
-        // // // sleep cycle update
-        // // for (int i=0; i < queSize; i++){
-        // //     if (this->waiting_que.front()->waiting_type=='S')
-        // //         this->waiting_que.front()->sleep_cycle--;
-        // //     this->waiting_que.push(this->waiting_que.front());
-        // //     this->waiting_que.pop();
-        // // }
+       
         if (userOperation!="exit"){
-            // for (int i=0; i < queSize; i++){
-            //     // pop process of which sleep cycle ends
-            //     if (this->waiting_que.front()->sleep_cycle==0 && this->waiting_que.front()->waiting_type=='S'){
-            //         this->waiting_que.front()->waiting_type='0';
-            //         activated.push(this->waiting_que.front());
-            //         this->waiting_que.pop();
-            //         continue;
-            //     }
-            //     this->waiting_que.push(this->waiting_que.front());
-            //     this->waiting_que.pop();
-            // }
             while(!activated.empty()){
                 this->ready_que.push(activated.front());
                 activated.pop();
@@ -113,6 +97,7 @@ void os::Kernel::run(){
                 this->kernel_status.process_new = NULL;
             }
             this->kernel_status.process_running = this->ready_que.front();
+            
             this->ready_que.pop();
             this->printKernelStatus();
             this->kernel_status.mode="user";
@@ -167,7 +152,8 @@ void os::Kernel::run(){
             // exit
             else if(userOperation == "exit"){
                 this->kernel_status.process_terminated = this->kernel_status.process_running;
-                this->kernel_status.process_terminated->releaseAll(&(this->physical_memory));
+                this->kernel_status.process_terminated->releaseAll(&physical_memory, &ready_que, &waiting_que);
+
                 this->kernel_status.process_running=NULL;
                 queSize =  this->waiting_que.size();
                 // pop process of which sleep cycle ends
@@ -195,20 +181,26 @@ void os::Kernel::run(){
                 this->printKernelStatus();
                 delete this->kernel_status.process_terminated;
                 this->kernel_status.process_terminated=NULL;
+                // ===================
+                if (!ready_que.empty()) ready_que.front()->pageTableUpdate(&physical_memory);
+                // ===================
+                
             }
             // fork_and_exec
             else if(userOperation.find("fork_and_exec") != std::string::npos){
                 std::string pName = userOperation.substr(14);
-                program = new Process(pName, 0, 0, 0, pid++, ppid, '0', os::VSIZE, os::PSIZE);
+                program = new Process(pName, 0, 0, 0, pid++, ppid, '0', os::VSIZE,this->kernel_status.process_running->virtual_memory,os::PSIZE);
 
-                // copy parents' virtual memory and page table
-                program->virtual_memory = this->kernel_status.process_running->virtual_memory;
+                // share parents' virtual memory and page table
+                // program->virtual_memory = this->kernel_status.process_running->virtual_memory;
+                program->pageID = this->kernel_status.process_running->pageID;
+                program->allocID = this->kernel_status.process_running->allocID;
                 program->page_table = this->kernel_status.process_running->page_table;
 
                 // change permission 
                 for (int i=0; i < os::VSIZE; i++){
-                    program->virtual_memory.permissions[i]='R';
-                    this->kernel_status.process_running->virtual_memory.permissions[i]='R';
+                    program->virtual_memory->permissions[i]='R';
+                    this->kernel_status.process_running->virtual_memory->permissions[i]='R';
                 }
 
                 this->kernel_status.process_new = program;
@@ -221,18 +213,9 @@ void os::Kernel::run(){
 
             // memory_allocate
             else if(userOperation.find("memory_allocate") != std::string::npos){
-                uint8_t n_alloc = (uint8_t)std::stoi(userOperation.substr(strlen("memory_allocate")+1));
+                int n_alloc = (int)std::stoi(userOperation.substr(strlen("memory_allocate")+1));
                 
-                for (uint8_t i=0; i < n_alloc; i++){
-                    uint8_t idx = this->kernel_status.process_running->virtual_memory.pageID + i;
-                    this->kernel_status.process_running->page_table[idx].first = idx;
-                    this->kernel_status.process_running->page_table[idx].second = this->physical_memory.frameAlloc(this->cycle, os::Kernel::method);
-                    this->kernel_status.process_running->virtual_memory.allocationIDs[idx] = this->kernel_status.process_running->virtual_memory.allocID;
-                }
-
-                this->kernel_status.process_running->virtual_memory.pageID+= n_alloc;
-                this->kernel_status.process_running->virtual_memory.allocID++;
-
+                this->kernel_status.process_running->malloc(n_alloc, &(this->physical_memory), cycle, os::Kernel::method);
                 this->kernel_status.process_ready.push(this->kernel_status.process_running);
                 this->kernel_status.process_running = NULL;
 
@@ -241,8 +224,8 @@ void os::Kernel::run(){
             }
             // memory_release
             else if(userOperation.find("memory_release") != std::string::npos){
-                uint8_t allocID = (uint8_t)std::stoi(userOperation.substr(strlen("memory_release")+1));
-                this->kernel_status.process_running->frameRelease(allocID, &(this->physical_memory));
+                int allocID = (int)std::stoi(userOperation.substr(strlen("memory_release")+1));
+                this->kernel_status.process_running->frameRelease(allocID, &physical_memory, &ready_que, &waiting_que);
                 this->kernel_status.process_ready.push(this->kernel_status.process_running);
                 this->kernel_status.process_running = NULL;
 
@@ -251,10 +234,19 @@ void os::Kernel::run(){
             
         }
         else if (cmd == "fault"){
+            fault=false;
             // memory_read page fault
             if(userOperation.find("memory_read") != std::string::npos){
+                int pageID = (int)std::stoi(userOperation.substr(strlen("memory_read")+1));
+               
+                int pNo=-1;
+                for (int i=0; i < os::VSIZE; i++){
+                    if (this->kernel_status.process_running->virtual_memory->pageIDs[i] == pageID)
+                        {pNo=i; break;}
+                }
+                assert(pNo!=-1 && "You can't read memory that does not exist on virtual memory");
                 
-                
+                this->kernel_status.process_running->pageFaultHandler((int)pNo, &physical_memory, cycle, os::Kernel::method);
                 this->ready_que.push(this->kernel_status.process_running);
                 this->kernel_status.process_running = NULL;
                 this->printKernelStatus();
@@ -262,12 +254,35 @@ void os::Kernel::run(){
 
             // memory_write fault ( protection || page )
             else if(userOperation.find("memory_write") != std::string::npos){
-                // Parent process should have ppid of 0
-                if (this->kernel_status.process_running->ppid==0){
-                    
+                int pageID = (int)std::stoi(userOperation.substr(strlen("memory_write")+1));
+                int pNo=-1;
+                for (int i=0; i < os::VSIZE; i++){
+                    if (this->kernel_status.process_running->virtual_memory->pageIDs[i] == pageID)
+                        {pNo=i; break;}
+                        // if(kernel_status.process_running->page_table[i].second!=-1) {pNo=i; break;}
+                }
+
+                // Parent process 
+                if (this->kernel_status.process_running->pid == \
+                    physical_memory.occupied[this->kernel_status.process_running->page_table[pNo].second].first)
+                {
+                    // 'W' permission -  page fault
+                    if (this->kernel_status.process_running->virtual_memory->permissions[pNo]=='W'){
+                        this->kernel_status.process_running->pageFaultHandler((int)pNo, &physical_memory, cycle, os::Kernel::method);
+                    // 'R' permission - protection fault
+                    } else{
+                        kernel_status.process_running->protectionFaultHandler(pNo, &physical_memory, &ready_que, &waiting_que);
+                    }
                 // Child process
                 } else{
-
+                    // 'W' permission -  page fault
+                    if (this->kernel_status.process_running->virtual_memory->permissions[pNo]=='W'){
+                        this->kernel_status.process_running->pageFaultHandler((int)pNo, &physical_memory, cycle, os::Kernel::method);
+                    // 'R' permission - protection fault
+                    } else{
+                        kernel_status.process_running->protectionFaultHandler(pNo, &physical_memory, &ready_que, &waiting_que);
+                        this->kernel_status.process_running->pageFaultHandler((int)pNo, &physical_memory, cycle, os::Kernel::method);
+                    }
                 }
                 this->ready_que.push(this->kernel_status.process_running);
                 this->kernel_status.process_running = NULL;
@@ -277,30 +292,52 @@ void os::Kernel::run(){
         }
         // user mode
         else{
+            fault=false;
             // memory read
             if(cmd.find("memory_read") != std::string::npos){
-                uint8_t pageID = (uint8_t)std::stoi(cmd.substr(strlen("memory_read")+1));
+                int pageID = (int)std::stoi(cmd.substr(strlen("memory_read")+1));
                 this->printKernelStatus(); 
-                if (this->kernel_status.process_running->page_table[pageID].second == -1){
-                    this->kernel_status.mode="kernel";
-                    this->fault=true;
+                fault=true;
+                for (int i=0; i < os::VSIZE; i++){
+                    if (this->kernel_status.process_running->virtual_memory->pageIDs[i] == pageID){
+                        physical_memory.readMem(kernel_status.process_running->page_table[i].second, cycle);
+                        if(kernel_status.process_running->page_table[i].second!=-1) {
+                            fault=false;
+                        }
+                        break;
+                    }
                 }
+                if (fault)  this->kernel_status.mode="kernel";
             }
+
             // memory write
             else if(cmd.find("memory_write") != std::string::npos){
-                uint8_t pageID = (uint8_t)std::stoi(cmd.substr(strlen("memory_write")+1));
+                int pageID = (int)std::stoi(cmd.substr(strlen("memory_write")+1));
                 this->printKernelStatus(); 
-                // 'W' permission -  page fault
-                if (this->kernel_status.process_running->virtual_memory.permissions[pageID]=='W'){
-                    if (this->kernel_status.process_running->page_table[pageID].second == -1){
-                        this->kernel_status.mode="kernel";
-                        this->fault=true;
+
+                
+                int pNo=-1;
+                for (int i=0; i < os::VSIZE; i++){
+                    if (this->kernel_status.process_running->virtual_memory->pageIDs[i] == pageID){
+                        pNo=i; 
+                        physical_memory.readMem(kernel_status.process_running->page_table[i].second, cycle);
+                        break;
                     }
+                }
+                assert(pNo!=-1 && "You can't write on the memory that does not exist on virtual memory");
+                
+                // 'W' permission -  page fault
+                if (this->kernel_status.process_running->virtual_memory->permissions[pNo]=='W'){
+                    fault=false;
+                    if(kernel_status.process_running->page_table[pNo].second==-1) fault=true;
+                    if (fault)  this->kernel_status.mode="kernel";
+                   
                 // 'R' permission -  protection fault
                 } else{
                     this->kernel_status.mode="kernel";
                     this->fault=true;
                 }
+                
             }
             // mode switch
             // "sleep", "fork_and_exec", "wait", "exit", "memory allocate", "memory release"

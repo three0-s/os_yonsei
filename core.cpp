@@ -2,7 +2,7 @@
 
 
 
-void os::Status::printStatus(std::string fname){
+void os::Status::printStatus(std::string fname, os::PhysicalMemory* pMem){
     std::ofstream resultFile(fname, std::ios_base::app);
     if (resultFile.is_open()){
         // 0. 몇번째 cycle인지
@@ -18,61 +18,74 @@ void os::Status::printStatus(std::string fname){
             Process* i = this->process_running;
             resultFile << "3. running: "<< i->pid << "(" << i->name.c_str() << ", " << i->ppid << ")\n";
         }
-        // 4. 현재 ready 상태인 프로세스의 정보. 왼쪽에 있을 수록 먼저 queue에 들어온 프로세스이다.
-        if (this->process_ready.size() == 0) {
-            resultFile << "4. ready: none\n";
-        } else {
-            resultFile << "4. ready:";
-            for (int i = 0; i < this->process_ready.size(); ++i) { // 공백 한칸으로 구분
-                resultFile << " " << this->process_ready.front()->pid;
-                this->process_ready.push(this->process_ready.front());
-                this->process_ready.pop();
+        // 4. Physical Memory
+        resultFile << "4. physical memory:\n";
+        resultFile << "|";
+        for (int i=0; i < os::PSIZE; i++){
+            if (pMem->occupied[i].first==-1)
+                resultFile << "-";
+            else resultFile << pMem->occupied[i].first << "(" << pMem->occupied[i].second << ")";
+            if (i%4 == 3) resultFile << "|";
+            else    resultFile << " ";
+        }
+        resultFile << "\n";
+
+        if (this->process_running != NULL) {
+            // 5. Virtual Memory
+            resultFile << "5. virtual memory:\n";
+            resultFile << "|";
+            for (int i=0; i < os::VSIZE; i++){
+                if (process_running->virtual_memory->pageIDs[i]==-1)
+                    resultFile << "-";
+                else resultFile << process_running->virtual_memory->pageIDs[i];
+                if (i%4 == 3) resultFile << "|";
+                else    resultFile << " ";
+            }
+            resultFile << "\n";
+
+            // 6. Page Table
+            resultFile << "6. page table:\n";
+            // first line
+            resultFile << "|";
+            for (int i=0; i < os::VSIZE; i++){
+                if (process_running->page_table[i].second==-1)
+                    resultFile << "-";
+                else resultFile << process_running->page_table[i].second;
+                if (i%4 == 3) resultFile << "|";
+                else    resultFile << " ";
+            }
+            resultFile << "\n";
+            // second line
+            resultFile << "|";
+            for (int i=0; i < os::VSIZE; i++){
+                if (process_running->page_table[i].first==-1)
+                    resultFile << "-";
+                else resultFile << process_running->virtual_memory->permissions[i];
+                if (i%4 == 3) resultFile << "|";
+                else    resultFile << " ";
             }
             resultFile << "\n";
         }
-        // 5. 현재 waiting 상태인 프로세스의 정보. 왼쪽에 있을 수록 먼저 waiting이 된 프로세스이다.
-        if (this->process_waiting.size() == 0) {
-            resultFile << "5. waiting: none\n";
-        } else {
-            resultFile << "5. waiting:";
-            for (int i = 0; i < this->process_waiting.size(); ++i) { // 공백 한칸으로 구분
-                resultFile << " " << this->process_waiting.front()->pid << "(" << this->process_waiting.front()->waiting_type << ")";
-                this->process_waiting.push(this->process_waiting.front());
-                this->process_waiting.pop();
-            }
-            resultFile << "\n";
-        }
-        // 6. New 상태의 프로세스
-        if (this->process_new == NULL) {
-            resultFile << "6. new: none\n";
-        } else {
-            Process* i = this->process_new;
-            resultFile << "6. new: "<< i->pid << "(" << i->name.c_str() << ", " << i->ppid << ")\n";
-        }
-        // 7. Terminated 상태의 프로세스
-        if (this->process_terminated == NULL) {
-            resultFile << "7. terminated: none\n";
-        } else {
-            Process* i = this->process_terminated;
-            resultFile << "7. terminated: "<< i->pid << "("<<i->name.c_str() << ", " << i->ppid << ")\n";
-        }
-        // 매 cycle 간의 정보는 두번의 개행으로 구분
+        
         resultFile << "\n";
     }
     resultFile.close();
 }
 
 
-uint8_t os::PhysicalMemory::frameAlloc(uint64_t tick, std::string method){
+int os::PhysicalMemory::frameAlloc(uint64_t tick, std::string method){
+    // update the base and limit register
+    this->updateMemReg();
+
     // out of memory
     if (base == os::PSIZE){
         // out of memory
-        uint8_t victim;
-
+        int victim;
         if (method=="lru"){
             victim = 0;
             for (int i=1; i < this->order.size(); i++){
-                if (order[i] < order[victim]) victim=i;
+                if (order[victim]==-1) victim=i;
+                else if (order[i]!=-1 && order[victim]!=-1) victim = order[i] < order[victim]? i: victim;
             }
         }
         else if (method=="fifo"){
@@ -81,20 +94,28 @@ uint8_t os::PhysicalMemory::frameAlloc(uint64_t tick, std::string method){
         }
         else if (method=="lfu"){
             victim = 0;
-            for (int i=1; i < frequency.size(); i++){
-                if (frequency[i] < frequency[victim]) victim=i;
+            for (int i=1; i < this->frequency.size(); i++){
+                if (frequency[victim]==-1) victim=i;
+                else if (frequency[i]!=-1 && frequency[victim]!=-1) victim = frequency[i] < frequency[victim]? i: victim;
             }
         }
         else if (method=="mfu"){
             victim = 0;
-            for (int i=1; i < frequency.size(); i++){
-                if (frequency[i] > frequency[victim]) victim=i;
+            for (int i=1; i < this->frequency.size(); i++){
+                if (frequency[victim]==-1) victim=i;
+                else if (frequency[i]!=-1 && frequency[victim]!=-1) victim = frequency[i] > frequency[victim]? i: victim;
             }
         } 
+        // lru
+        order[victim]=-1;
+        // lfu, mfu
+        frequency[victim]=-1;
+        // fifo
+        this->fifo.push(victim);
         return victim;
 
     }else{
-        uint8_t ret = base;
+        int ret = base;
         // lru
         this->order[this->base]=tick;
         // lfu, mfu
@@ -102,40 +123,130 @@ uint8_t os::PhysicalMemory::frameAlloc(uint64_t tick, std::string method){
         // fifo
         this->fifo.push(this->base);
 
-
-        // update the base and limit register
-        if (limit-1 > 0){
-            this->base++;
-            this->limit--;
-        }
-        else this->updateMemReg();
         return ret;
     }
 }
 
-
-void os::Process::malloc(uint8_t n_alloc, os::PhysicalMemory* pMem, uint64_t cycle, std::string method){
-    for (uint8_t i=0; i < n_alloc; i++){
-        uint8_t idx = virtual_memory.pageID + i;
-        page_table[idx].first = idx;
-        page_table[idx].second = pMem->frameAlloc(cycle, method);
-        virtual_memory.allocationIDs[idx] = virtual_memory.allocID;
+void os::Process::pageTableUpdate(os::PhysicalMemory* pMem){
+    for (int i=0; i < os::VSIZE; i++){
+        if (virtual_memory->pageIDs[i] != -1){
+            bool found = false;
+            for (int j=0; j < os::PSIZE; j++){
+                if (virtual_memory->pageIDs[i] == pMem->occupied[j].second){
+                    page_table[i].second = j;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                page_table[i].second = -1;
+            
+        }
     }
 
-    virtual_memory.pageID+= n_alloc;
-    virtual_memory.allocID++;
 }
 
+void os::PhysicalMemory::readMem(int addr, uint64_t tick){
+    // lru
+    this->order[addr]=tick;
+    // lfu, mfu
+    this->frequency[addr]++;
+    // fifo
+    this->fifo.push(addr);
+}
+
+void os::Process::malloc(int n_alloc, os::PhysicalMemory* pMem, uint64_t cycle, std::string method){
+    for (int i=0; i < os::VSIZE-n_alloc; i++){
+        this->virtual_memory->updateMemReg(i);
+        if (this->virtual_memory->limit >= n_alloc) break;
+    }
+    virtual_memory = new VirtualMemory(*virtual_memory);
+
+    for (int i=0; i < n_alloc; i++){
+        int idx = virtual_memory->base + i;
+        page_table[idx].first = idx;
+        page_table[idx].second = pMem->frameAlloc(cycle, method);
+        virtual_memory->permissions[idx]='W';
+
+        // table update
+        for (int j=0; j < os::VSIZE; j++){
+            if (page_table[j].second == page_table[idx].second && j!= idx){
+                page_table[j].second=-1;
+            }
+        }
+        // Process ID
+        pMem->occupied[page_table[idx].second].first = pid;
+        // Page ID
+        pMem->occupied[page_table[idx].second].second = this->pageID;
+
+        virtual_memory->allocationIDs[idx] = allocID;
+        virtual_memory->pageIDs[idx] = this->pageID++;
+    }
+    allocID++;
+}
+
+
+void os::Process::pageFaultHandler(int pNo, os::PhysicalMemory* pMem, uint64_t cycle, std::string method){
+    page_table[pNo].first = pNo;
+    page_table[pNo].second = pMem->frameAlloc(cycle, method);
+    virtual_memory->permissions[pNo]='W';
+    // table update
+    for (int j=0; j < os::VSIZE; j++){
+        if (page_table[j].second == page_table[pNo].second && j!= pNo){
+            page_table[j].second=-1;
+        }
+    }
+    // Process ID
+    pMem->occupied[page_table[pNo].second].first = pid;
+    // Page ID
+    pMem->occupied[page_table[pNo].second].second = virtual_memory->pageIDs[pNo];
+}
+            
+
+void os::Process::protectionFaultHandler(int pNo, os::PhysicalMemory* pMem, std::queue<os::Process*>* readyQue, std::queue<os::Process*>* waitingQue){
+    // permission change
+    if (virtual_memory->permissions[pNo]=='R'){
+        // Read only permission
+        virtual_memory->permissions[pNo]='W'; 
+        for (int j=0; j < readyQue->size(); j++){
+            readyQue->front()->virtual_memory->permissions[pNo]='W';
+            readyQue->push(readyQue->front());
+            readyQue->pop();
+        }
+        for (int j=0; j < waitingQue->size(); j++){
+            waitingQue->front()->virtual_memory->permissions[pNo]='W';
+            waitingQue->push(waitingQue->front());
+            waitingQue->pop();
+        }
+    } 
+}
+            
+
+
+void os::VirtualMemory::updateMemReg(int st){
+    bool hasHole=false;
+    for (int i=st; i < os::VSIZE; i++){
+        if (hasHole){
+            if (allocationIDs[i]!=-1) break;
+            this->limit++;
+        }
+        if (allocationIDs[i]==-1 && !hasHole){
+            hasHole=true;
+            this->base = i;
+            this->limit = 1;
+        }
+    }
+}
 
 
 void os::PhysicalMemory::updateMemReg(){
     bool hasHole=false;
     for (int i=0; i < os::PSIZE; i++){
         if (hasHole){
-            if (this->occupied[i]) break;
+            if (occupied[i].first!=-1) break;
             this->limit++;
         }
-        if (!this->occupied[i] && !hasHole){
+        if (occupied[i].first==-1 && !hasHole){
             hasHole=true;
             this->base = i;
             this->limit = 1;
@@ -150,44 +261,104 @@ void os::PhysicalMemory::updateMemReg(){
 
 os::VirtualMemory::VirtualMemory(const os::VirtualMemory& vm): Memory(vm.m_size), 
                     allocationIDs(vm.allocationIDs.size()),
-                    permissions(vm.permissions.size()){
-    pageID = vm.pageID;
-    allocID = vm.allocID;
+                    permissions(vm.permissions.size()),
+                    pageIDs(vm.pageIDs.size()){
+    base = vm.base;
     for (int i=0; i < vm.m_size; i++){
         allocationIDs[i]=vm.allocationIDs[i];
         permissions[i]=vm.permissions[i];
+        pageIDs[i]=vm.pageIDs[i];
     }
 }
 
 
-void os::Process::frameRelease(uint8_t allocID, os::PhysicalMemory* pMem){
+void os::Process::frameRelease(int aID, os::PhysicalMemory* pMem, std::queue<os::Process*>* readyQue, std::queue<os::Process*>* waitingQue){
+   
+    // permission change
     for (int i=0; i < os::VSIZE; i++){
-        // release
-        if (virtual_memory.allocationIDs[i]==allocID){
-            if (virtual_memory.permissions[i]=='R'){
-                // DO SOMETHING
+        if (virtual_memory->allocationIDs[i]==aID){
+            if (virtual_memory->permissions[i]=='R'){
                 // Read only permission
-            } else{
-                page_table[i].second=-1;
-                pMem->occupied[i]=false;
-                virtual_memory.allocationIDs[i]=-1;
-                pMem->updateMemReg();
-            }
+                virtual_memory->permissions[i]='W'; 
+                for (int j=0; j < readyQue->size(); j++){
+                    readyQue->front()->virtual_memory->permissions[i]='W';
+                    readyQue->push(readyQue->front());
+                    readyQue->pop();
+                }
+                for (int j=0; j < waitingQue->size(); j++){
+                    waitingQue->front()->virtual_memory->permissions[i]='W';
+                    waitingQue->push(waitingQue->front());
+                    waitingQue->pop();
+                }
+                
+            } 
         }
     }
-}
-
-void os::Process::releaseAll(os::PhysicalMemory* pMem){
+    bool cow = false;
     for (int i=0; i < os::VSIZE; i++){
         // release
-        if (virtual_memory.permissions[i]=='R'){
-            // DO SOMETHING
-            // Read only permission
-        } else{
+        if (virtual_memory->allocationIDs[i]==aID){
+            // parent owns the frame
+            if (pid == pMem->occupied[page_table[i].second].first){
+                // Process ID
+                pMem->occupied[page_table[i].second].first=-1;
+                // Page ID
+                pMem->occupied[page_table[i].second].second=-1;
+
+                
+            } else{
+                // CoW
+                if (!cow) virtual_memory = new VirtualMemory(*virtual_memory);
+                cow=true;
+            }
+            virtual_memory->base--;
             page_table[i].second=-1;
-            pMem->occupied[i]=false;
-            virtual_memory.allocationIDs[i]=-1;
+            page_table[i].first=-1;
+            virtual_memory->allocationIDs[i]=-1;
+            virtual_memory->pageIDs[i]=-1;
             pMem->updateMemReg();
         }
     }
+}
+
+void os::Process::releaseAll(os::PhysicalMemory* pMem, std::queue<os::Process*>* readyQue, std::queue<os::Process*>* waitingQue){
+    // permission change
+    for (int i=0; i < os::VSIZE; i++){
+        if (virtual_memory->permissions[i]=='R'){
+            // Read only permission
+            virtual_memory->permissions[i]='W'; 
+            for (int j=0; j < readyQue->size(); j++){
+                readyQue->front()->virtual_memory->permissions[i]='W';
+                readyQue->push(readyQue->front());
+                readyQue->pop();
+            }
+            for (int j=0; j < waitingQue->size(); j++){
+                waitingQue->front()->virtual_memory->permissions[i]='W';
+                waitingQue->push(waitingQue->front());
+                waitingQue->pop();
+            }
+        } 
+    }
+    bool cow=false;
+    
+    for (int i=0; i < os::VSIZE; i++){
+        // parent owns the frame
+        if (pid == pMem->occupied[page_table[i].second].first){
+            // Process ID
+            pMem->occupied[page_table[i].second].first=-1;
+            // Page ID
+            pMem->occupied[page_table[i].second].second=-1;
+            
+        } else{
+            // CoW
+            if (!cow) virtual_memory = new VirtualMemory(*virtual_memory);
+            cow=true;
+        }
+        page_table[i].second=-1;
+        page_table[i].first=-1;
+        virtual_memory->allocationIDs[i]=-1;
+        virtual_memory->pageIDs[i]=-1;
+        pMem->updateMemReg();
+    }
+    virtual_memory->base=0;
 }

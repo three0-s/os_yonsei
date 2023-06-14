@@ -1,6 +1,0 @@
-fork_and_exec p1
-fork_and_exec p2
-fork_and_exec p3
-wait
-run 1
-exit

@@ -14,6 +14,10 @@ namespace os{
             Memory(int size): m_size(size){}
     };
 
+    bool mfu(const std::pair<int,int> &a, const std::pair<int,int> &b);
+    bool lfu(const std::pair<int,int> &a, const std::pair<int,int> &b);
+    bool lru(const std::pair<int,int> &a, const std::pair<int,int> &b);
+
     class VirtualMemory: Memory{
         public:
             int base, limit;
@@ -31,10 +35,10 @@ namespace os{
             std::queue<int> fifo;
             int base, limit;
             std::vector<std::pair<int, int>> occupied;
-            PhysicalMemory(int psize): Memory(psize), order(psize, -1), frequency(psize, -1), base(0), limit(psize), occupied(psize, std::pair<int, int>(-1, -1)){}
-            int frameAlloc(uint64_t tick, std::string method);
+            PhysicalMemory(int psize): Memory(psize), order(psize, -1), frequency(psize, 0), base(0), limit(psize), occupied(psize, std::pair<int, int>(-1, -1)){}
+            void frameAlloc(uint64_t tick, std::string method, std::vector<int>* allocatedIDs, int n_alloc, bool searchAll=true);
             void readMem(int addr, uint64_t tick);
-            void updateMemReg();
+            void updateMemReg(int st=0);
     };
 
     class Process {

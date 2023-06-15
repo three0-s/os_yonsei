@@ -1,6 +1,22 @@
 #include "core.hpp"
 
+bool os::mfu(const std::pair<int,int> &a, const std::pair<int,int> &b){
+    if (a.first > b.first) return true;
+    if (a.first < b.first) return false;
+    return (a.second < b.second);
+}
 
+bool os::lfu(const std::pair<int,int> &a, const std::pair<int,int> &b){
+    if (a.first < b.first && a.first != -1) return true;
+    if (a.first > b.first) return false;
+    return (a.second < b.second && a.first != -1);
+}
+
+bool os::lru(const std::pair<int,int> &a, const std::pair<int,int> &b){
+    if (a.first < b.first && a.first != -1) return true;
+    if (a.first > b.first) return false;
+    return (a.second < b.second && a.first != -1);
+}
 
 void os::Status::printStatus(std::string fname, os::PhysicalMemory* pMem){
     std::ofstream resultFile(fname, std::ios_base::app);
@@ -73,49 +89,11 @@ void os::Status::printStatus(std::string fname, os::PhysicalMemory* pMem){
 }
 
 
-int os::PhysicalMemory::frameAlloc(uint64_t tick, std::string method){
+void os::PhysicalMemory::frameAlloc(uint64_t tick, std::string method, std::vector<int>* allocatedIDs, int n_alloc, bool searchAll){
     // update the base and limit register
     this->updateMemReg();
-
-    // out of memory
-    if (base == os::PSIZE){
-        // out of memory
-        int victim;
-        if (method=="lru"){
-            victim = 0;
-            for (int i=1; i < this->order.size(); i++){
-                if (order[victim]==-1) victim=i;
-                else if (order[i]!=-1 && order[victim]!=-1) victim = order[i] < order[victim]? i: victim;
-            }
-        }
-        else if (method=="fifo"){
-            victim = this->fifo.front();
-            this->fifo.pop();
-        }
-        else if (method=="lfu"){
-            victim = 0;
-            for (int i=1; i < this->frequency.size(); i++){
-                if (frequency[victim]==-1) victim=i;
-                else if (frequency[i]!=-1 && frequency[victim]!=-1) victim = frequency[i] < frequency[victim]? i: victim;
-            }
-        }
-        else if (method=="mfu"){
-            victim = 0;
-            for (int i=1; i < this->frequency.size(); i++){
-                if (frequency[victim]==-1) victim=i;
-                else if (frequency[i]!=-1 && frequency[victim]!=-1) victim = frequency[i] > frequency[victim]? i: victim;
-            }
-        } 
-        // lru
-        order[victim]=-1;
-        // lfu, mfu
-        frequency[victim]=-1;
-        // fifo
-        this->fifo.push(victim);
-        return victim;
-
-    }else{
-        int ret = base;
+    for (int i=0; i < n_alloc && base != os::PSIZE; i++){
+        allocatedIDs->push_back(this->base);
         // lru
         this->order[this->base]=tick;
         // lfu, mfu
@@ -123,9 +101,67 @@ int os::PhysicalMemory::frameAlloc(uint64_t tick, std::string method){
         // fifo
         this->fifo.push(this->base);
 
-        return ret;
+        // update the base and limit register
+        this->updateMemReg(base+1);
+    }
+    // out of memory
+    if (base == os::PSIZE){
+        // out of memory
+        if (method=="lru"){
+            std::vector<std::pair<int, int> > order_pairs;
+            for (int i=0; i < order.size(); i++) order_pairs.push_back(std::pair<int, int> (order[i], i));
+            std::sort(order_pairs.begin(), order_pairs.end(), os::lru);
+            for (int i=0; allocatedIDs->size() < n_alloc; i++){
+                bool duplicate=false;
+                for (int id: *allocatedIDs) if (id == order_pairs[i].second) {duplicate=true; break;}
+                if (duplicate) continue;
+                allocatedIDs->push_back(order_pairs[i].second);
+            }
+        }
+        else if (method=="fifo"){
+            for (int i=fifo.front(); allocatedIDs->size() < n_alloc; fifo.pop(),i=fifo.front()) {
+                bool duplicate=false;
+                for (int id: *allocatedIDs) if (id == i) {duplicate=true; break;}
+                if (duplicate) continue;
+                allocatedIDs->push_back(i);
+            }
+        }
+        else if (method=="lfu"){
+            std::vector<std::pair<int, int> > frequency_pairs;
+            for (int i=0; i < frequency.size(); i++) frequency_pairs.push_back(std::pair<int, int> (frequency[i], i));
+            std::sort(frequency_pairs.begin(), frequency_pairs.end(), os::lfu);
+
+            for (int i=0; allocatedIDs->size() < n_alloc; i++){
+                bool duplicate=false;
+                for (int id: *allocatedIDs) if (id == frequency_pairs[i].second) {duplicate=true; break;}
+                if (duplicate) continue;
+                allocatedIDs->push_back(frequency_pairs[i].second);
+            }
+        }
+        else if (method=="mfu"){
+            std::vector<std::pair<int, int> > frequency_pairs;
+            for (int i=0; i < frequency.size(); i++) frequency_pairs.push_back(std::pair<int, int> (frequency[i], i));
+            std::sort(frequency_pairs.begin(), frequency_pairs.end(), os::mfu);
+            
+            for (int i=0; allocatedIDs->size() < n_alloc; i++){
+                bool duplicate=false;
+                for (int id: *allocatedIDs) if (id == frequency_pairs[i].second) {duplicate=true; break;}
+                if (duplicate) continue;
+                allocatedIDs->push_back(frequency_pairs[i].second);
+            }
+        } 
+        for (int victim: *allocatedIDs){
+             // lru
+            order[victim]=tick;
+            // lfu, mfu
+            frequency[victim]=1;
+            // fifo
+            this->fifo.push(victim);
+        }
+
     }
 }
+
 
 void os::Process::pageTableUpdate(os::PhysicalMemory* pMem){
     for (int i=0; i < os::VSIZE; i++){
@@ -161,11 +197,12 @@ void os::Process::malloc(int n_alloc, os::PhysicalMemory* pMem, uint64_t cycle, 
         if (this->virtual_memory->limit >= n_alloc) break;
     }
     virtual_memory = new VirtualMemory(*virtual_memory);
-
+    std::vector<int> frameIDs;
+    pMem->frameAlloc(cycle, method, &frameIDs, n_alloc);
     for (int i=0; i < n_alloc; i++){
         int idx = virtual_memory->base + i;
         page_table[idx].first = idx;
-        page_table[idx].second = pMem->frameAlloc(cycle, method);
+        page_table[idx].second = frameIDs[i];
         virtual_memory->permissions[idx]='W';
 
         // table update
@@ -187,8 +224,11 @@ void os::Process::malloc(int n_alloc, os::PhysicalMemory* pMem, uint64_t cycle, 
 
 
 void os::Process::pageFaultHandler(int pNo, os::PhysicalMemory* pMem, uint64_t cycle, std::string method){
+    std::vector<int> frameIDs;
+    pMem->frameAlloc(cycle, method, &frameIDs, 1);
+
     page_table[pNo].first = pNo;
-    page_table[pNo].second = pMem->frameAlloc(cycle, method);
+    page_table[pNo].second = frameIDs[0];
     virtual_memory->permissions[pNo]='W';
     // table update
     for (int j=0; j < os::VSIZE; j++){
@@ -239,9 +279,9 @@ void os::VirtualMemory::updateMemReg(int st){
 }
 
 
-void os::PhysicalMemory::updateMemReg(){
+void os::PhysicalMemory::updateMemReg(int st){
     bool hasHole=false;
-    for (int i=0; i < os::PSIZE; i++){
+    for (int i=st; i < os::PSIZE; i++){
         if (hasHole){
             if (occupied[i].first!=-1) break;
             this->limit++;

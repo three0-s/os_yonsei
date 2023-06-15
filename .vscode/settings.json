@@ -95,7 +95,9 @@
         "valarray": "cpp",
         "variant": "cpp",
         "numeric": "cpp",
-        "stop_token": "cpp"
+        "stop_token": "cpp",
+        "format": "cpp",
+        "span": "cpp"
     },
     "cmake.configureOnOpen": true,
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",

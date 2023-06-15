@@ -5,11 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Launch",
+            "program": "${fileDirname}/project3",
+            "args": ["test/test3", "lru"],
+            "cwd": "${workspaceFolder}"
+        },
+        
+        {
             "name": "C/C++: clang++ build and debug active file",
             "type": "cppdbg",
             "request": "launch",
             "program": "${fileDirname}/${fileBasenameNoExtension}",
-            "args": ["${workspaceFolder}"],
+            "args": ["${workspaceFolder}", "test/", "lru"],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
             "environment": [],

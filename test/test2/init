@@ -1,0 +1,9 @@
+memory_allocate 16
+memory_read 0
+memory_allocate 16
+fork_and_exec program1
+memory_release 0
+memory_release 1
+wait
+memory_allocate 16
+exit
